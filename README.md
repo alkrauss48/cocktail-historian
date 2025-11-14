@@ -19,7 +19,8 @@ cocktail-historian/
 ├── scripts/
 │   ├── 01_extract_text.py # Extract text from PDFs
 │   ├── 02_chunk_text.py   # Chunk text into structured JSONL
-│   └── 03_embed_qdrant.py  # Embed chunks and upsert into Qdrant
+│   ├── 03_embed_qdrant.py  # Embed chunks and upsert into Qdrant
+│   └── 04_search_qdrant.py # Interactive semantic search interface
 └── requirements.txt       # Python dependencies
 ```
 
@@ -123,6 +124,47 @@ python scripts/03_embed_qdrant.py --collection-name my_cocktails --batch-size 32
 
 **Note**: The script is idempotent—re-running it will safely re-upsert chunks (updates existing points with the same ID). Make sure Qdrant is running (`docker-compose up -d`) before executing this script.
 
+### Step 4: Interactive Semantic Search
+
+```bash
+python scripts/04_search_qdrant.py
+```
+
+This script:
+- Loads the same local embedding model used in Step 3 (default: `BAAI/bge-base-en-v1.5`)
+- Connects to Qdrant at `localhost:6333`
+- Provides an interactive REPL (Read-Eval-Print Loop) for querying
+- Embeds each query using the local model
+- Performs semantic search over the indexed chunks
+- Displays top-k results with similarity scores, metadata, and text previews
+
+**Output**: Interactive search results displayed in the terminal
+
+**Configuration options**:
+- `--collection-name`: Qdrant collection name (default: `cocktail_chunks`)
+- `--embedding-model`: Local embedding model name (default: `BAAI/bge-base-en-v1.5`)
+- `--top-k`: Number of results to return per query (default: 5)
+
+**Example usage**:
+```bash
+# Search with more results
+python scripts/04_search_qdrant.py --top-k 10
+
+# Use a different embedding model (must match the model used in Step 3)
+python scripts/04_search_qdrant.py --embedding-model BAAI/bge-small-en-v1.5
+
+# Search a different collection
+python scripts/04_search_qdrant.py --collection-name my_cocktails
+```
+
+**Usage tips**:
+- Type your query and press Enter to search
+- Press Enter on an empty line or Ctrl+C to exit
+- Results show similarity scores (higher is better), book titles, section titles, chunk indices, and text previews
+- The script uses the same embedding model as Step 3 to ensure query embeddings match the indexed chunk embeddings
+
+**Note**: Make sure Qdrant is running (`docker-compose up -d`) and that you've completed Steps 1-3 before using this script.
+
 ## Data Sources
 
 The project currently includes cocktail books from the late 1800s and early 1900s, including works by:
@@ -133,9 +175,9 @@ The project currently includes cocktail books from the late 1800s and early 1900
 
 ## Future Scripts
 
-Additional scripts will be added to complete the RAG pipeline, including:
-- Query interface for semantic search over the embedded chunks
+Additional scripts may be added to complete the RAG pipeline, including:
 - RAG application for question-answering over historical cocktail recipes
+- Advanced filtering and metadata-based search capabilities
 
 ## Notes
 
