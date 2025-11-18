@@ -63,8 +63,9 @@ This script:
 - Extracts text using PyMuPDF
 - Detects if OCR is needed (based on empty page ratio)
 - Runs OCRmyPDF for PDFs that need OCR processing
-- Normalizes text (removes ligatures, page numbers, extra whitespace)
-- Saves cleaned text to `data_derived/text/` with metadata headers
+- Normalizes text (removes ligatures, control characters, Unicode whitespace, page numbers, extra whitespace)
+- Saves cleaned text to `data_derived/text/` with metadata headers (MD5 hash, filename)
+- Automatically re-extracts if source PDF changes (detected via MD5 comparison)
 
 **Output**: Text files in `data_derived/text/` (one `.txt` file per PDF)
 
@@ -238,7 +239,7 @@ Additional scripts may be added to enhance the RAG pipeline, including:
 
 ## Notes
 
-- The scripts are idempotent: re-running them will skip already-processed files or safely update existing data
+- The scripts are idempotent: re-running them will skip already-processed files or safely update existing data. Step 1 will automatically re-extract if a source PDF's MD5 hash changes (indicating the PDF was updated).
 - OCR processing can be slow for large PDFs; processed OCR files are cached in `data_raw/ocr/`
 - Text normalization handles common OCR issues like ligatures and page number artifacts
 - Chunking uses sentence boundaries and section detection to maintain context
