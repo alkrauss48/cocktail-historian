@@ -28,7 +28,7 @@ QDRANT_HOST = "localhost"
 QDRANT_PORT = 6333
 DEFAULT_COLLECTION_NAME = "cocktail_chunks"
 DEFAULT_EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
-DEFAULT_TOP_K = 5
+DEFAULT_TOP_K = 8
 
 
 def load_embedding_model(model_name: str) -> SentenceTransformer:
@@ -76,13 +76,10 @@ def format_result(result, idx: int):
     chunk_text = payload.get("chunk_text", "")
     chunk_index = payload.get("chunk_index")
 
-    # Create a short preview
+    # Create preview with full chunk text
     text_preview = ""
     if chunk_text:
-        cleaned = chunk_text.replace("\n", " ").replace("\t", " ")
-        text_preview = cleaned[:250]
-        if len(cleaned) > 250:
-            text_preview += "..."
+        text_preview = chunk_text.replace("\n", " ").replace("\t", " ")
 
     return f"""
 Result #{idx + 1}

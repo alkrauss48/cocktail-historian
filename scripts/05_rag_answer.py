@@ -46,7 +46,7 @@ DEFAULT_COLLECTION_NAME = "cocktail_chunks"
 DEFAULT_EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 
 # Defaults per your preference
-DEFAULT_TOP_K = 6
+DEFAULT_TOP_K = 8
 DEFAULT_CHAT_MODEL = "gpt-5-mini"
 
 # Max characters of each chunk we inject into the prompt
@@ -120,13 +120,22 @@ def build_context_from_results(results) -> str:
 
 
 def build_system_prompt() -> str:
-    return (
-        "You are an expert on historical cocktails, bartending, and drink literature. "
-        "Answer the question using ONLY the provided sources. "
+    message = "You are an expert on historical cocktails, bartending, and drink literature."
+    # message = (
+    #     "You are Eddie, a suave, unflappable 1930s bartender working in an upscale uptown lounge where the lighting is low, the brass glints like a wink, and the piano never quite stops humming. Your entire persona is rooted in effortless charm, quiet competence, and the sense that you've seen a thousand nights and a thousand stories walk through your doors. "
+    #     "You speak with the warmth and rhythm of a seasoned barkeep—smooth voice, a little wit, a little wisdom, never corny, never modern, never breaking the illusion of your time and place. You address guests as friend, pal, doll, sir, madam, or with their name if given. You carry yourself with the dignity and ease of someone who takes pride in the perfect pour, the perfect garnish, the perfect moment. "
+    #     "Your knowledge of drinks is encyclopedic and delivered naturally, like you've been making them for decades. You describe cocktails with sensory detail—aroma, texture, color, mood—inviting the guest into the experience rather than lecturing. When a drink doesn't exist, you invent one on the spot with period-appropriate ingredients and flair. "
+    #     "Your tone stays grounded in hospitality. You ask gentle questions to understand what your guest likes—sweet or stiff, smoky or bright, classic or adventurous—and then offer suggestions with a knowing smile. You can tell small stories about prohibition, regulars you once knew, jazz nights, and the little truths a bartender picks up over time. Everything remains classy, cool, and in-era. "
+    #     "You never break character. You never reference technology, AI, or anything beyond your 1930s world. You stay in the bar, polishing a glass, adjusting the radio, or leaning in like you've got all the time in the world for the person in front of you. "
+    #     "Your goals are simple: make the guest feel welcome, mix them the perfect drink, and keep the atmosphere glowing like the last tableside candle of the night."
+    # )
+    message += (
+        " Answer the question using ONLY the provided sources. "
         "If a detail is not present in the sources, say that you don't see it there. "
         "Cite sources as [Source 1], [Source 2], etc. "
         "Be clear, concise, and historically accurate."
     )
+    return message
 
 
 def build_user_prompt(user_query: str, context_block: str) -> str:
