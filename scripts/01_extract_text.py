@@ -52,8 +52,79 @@ def normalize(text: str) -> str:
     text = text.replace('\u00AD', '')
     # Normalize Unicode whitespace to regular space
     text = re.sub(r'[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]', ' ', text)
+
     # Strip standalone page numbers (e.g., lines containing only "123")
     text = re.sub(r"\n\s*\d{1,4}\s*\n", "\n", text)
+    # Remove lines that look like page numbers with dashes (e.g., "- 9-")
+    text = re.sub(r"\n\s*[-—]\s*\d{1,4}\s*[-—]\s*\n", "\n", text)
+
+    # Remove common copyright/library catalog patterns
+    text = re.sub(r'COPYRIGHT\s+DEPOS[IU]T?\d*', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'TWO\s+COP[IL]-U:', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'[R|r]ir\.CtlVEC-', '', text)
+    text = re.sub(r'OpyqiAMT\s+PMTBV', '', text)
+    text = re.sub(r'PLA\d+\s+\^t\s+VXc\s+No\.', '', text)
+    text = re.sub(r"'¥Ml\s+LliRARV\s+\d+", '', text)
+
+    # Line-by-line filtering to remove OCR garbage
+    lines = text.split('\n')
+    cleaned_lines = []
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            cleaned_lines.append(line)
+            continue
+
+        # Calculate various quality metrics for the line
+        total = len(stripped)
+        alnum = sum(c.isalnum() for c in stripped)
+        alpha = sum(c.isalpha() for c in stripped)
+        spaces = stripped.count(' ')
+
+        # Skip very short lines (< 3 chars) unless they look like valid abbreviations
+        if total < 3:
+            continue
+
+        # Skip lines that are mostly symbols/punctuation (less than 40% alphanumeric)
+        if total > 0 and (alnum / total) < 0.40:
+            continue
+
+        # Skip lines with no vowels (likely OCR garbage) - but allow very short lines
+        if alpha > 5:
+            vowels = sum(1 for c in stripped.lower() if c in 'aeiouy')
+            if vowels == 0:
+                continue
+            # Also skip if <5% vowels (likely garbage like "AMONLNAYM")
+            if (vowels / alpha) < 0.05:
+                continue
+
+        # Skip lines that are all caps AND have no spaces (likely OCR garbage)
+        # Exception: keep if it's a plausible title (has spaces)
+        if alpha > 0 and stripped.isupper() and spaces == 0 and total > 15:
+            continue
+
+        # Skip lines with unusual character patterns (OCR artifacts)
+        # e.g., lines with lots of apostrophes or quotes at odd positions
+        if stripped.count("'") > 3 or stripped.count('"') > 2:
+            # Check if they're in sensible positions (contractions, quotes)
+            if not re.search(r"(^['\"]|['\"]$|\w'\w)", stripped):
+                continue
+
+        cleaned_lines.append(line)
+
+    text = '\n'.join(cleaned_lines)
+
+    # More aggressive OCR spacing fixes - multiple passes
+    # Fix single letter spaces (e.g., "t he" -> "the", "t o" -> "to")
+    for _ in range(5):  # Multiple passes to catch consecutive errors
+        # Fix "t he" -> "the"
+        text = re.sub(r'\b([a-z]) ([a-z]{1,})\b', r'\1\2', text, flags=re.IGNORECASE)
+        # Fix "drin k" -> "drink"
+        text = re.sub(r'\b([a-z]{2,}) ([a-z])\b', r'\1\2', text, flags=re.IGNORECASE)
+        # Fix "a nd" -> "and", "i s" -> "is" (very common OCR errors)
+        text = re.sub(r'\b(a|i) (nd|s|t|n|ll|re)\b', r'\1\2', text, flags=re.IGNORECASE)
+
     # Collapse multiple spaces/tabs into single space
     text = re.sub(r"[ \t]+", " ", text)
     # Limit multiple consecutive newlines to maximum of two

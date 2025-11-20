@@ -106,10 +106,131 @@ def split_into_sections(text: str):
     return [s for s in sections if s["text"]]
 
 
+def is_valuable_chunk(text: str) -> bool:
+    """
+    Determine if a chunk contains valuable content or is just noise.
+    Returns False for index entries, ads, publisher info, etc.
+    """
+    stripped = text.strip()
+
+    # Too short to be valuable
+    if len(stripped) < 20:
+        return False
+
+    # Very short chunks (< 50 chars) need extra scrutiny
+    if len(stripped) < 50:
+        # Check for publisher patterns
+        publisher_patterns = [
+            r"publication[s]?",
+            r"pub['\"]?[hl]",  # catches "PubHcationa", "Pub'l", etc.
+            r"press\s*(ltd|inc)?",
+            r"company",
+            r"by\s+mail"
+        ]
+        lower_text = stripped.lower()
+        if any(re.search(pattern, lower_text) for pattern in publisher_patterns):
+            return False
+
+        # Check for unusual consonant clusters (OCR artifacts)
+        # Remove vowels and spaces, see what's left
+        consonants_only = re.sub(r'[aeiouy\s\d]', '', stripped.lower())
+        if len(consonants_only) > 10 and len(consonants_only) > len(stripped) * 0.6:
+            return False
+
+        # Check for random capitalization patterns (e.g., "S:AHMONLNAY")
+        # More than 50% caps in a short chunk that isn't a proper title
+        alpha_chars = [c for c in stripped if c.isalpha()]
+        if alpha_chars:
+            upper_ratio = sum(1 for c in alpha_chars if c.isupper()) / len(alpha_chars)
+            # If >60% uppercase but has weird characters (colons, random punctuation), likely garbage
+            if upper_ratio > 0.6 and re.search(r'[:\'"]{1,}[A-Z]', stripped):
+                return False
+
+    # Check if it's mostly OCR garbage (lots of random characters, few real words)
+    # Count alphanumeric characters
+    alnum = sum(c.isalnum() for c in stripped)
+    if len(stripped) > 0 and (alnum / len(stripped)) < 0.4:
+        return False
+
+    # Check if it looks like an index/table of contents
+    # Pattern: lots of dots with numbers at the end (e.g., "Brandy Cocktail . . . . . 11")
+    if re.search(r'\.{3,}\s*\d+', stripped):
+        return False
+
+    # Check for excessive ellipsis or dot leaders
+    dot_count = stripped.count('.')
+    if len(stripped) > 0 and (dot_count / len(stripped)) > 0.15:
+        return False
+
+    # Check if it's mostly a list of items (index-like)
+    # Pattern: multiple short lines, many with trailing numbers or no punctuation
+    lines = stripped.split('\n')
+    if len(lines) >= 5:
+        short_lines = sum(1 for ln in lines if len(ln.strip()) < 40)
+        lines_with_trailing_numbers = sum(1 for ln in lines if re.search(r'\d+\s*$', ln.strip()))
+
+        # If most lines are short and many have trailing numbers, it's likely an index
+        if (short_lines / len(lines)) > 0.7 and (lines_with_trailing_numbers / len(lines)) > 0.3:
+            return False
+
+        # If it's just a list of short items without much prose, skip it
+        if (short_lines / len(lines)) > 0.8:
+            return False
+
+    # Check for advertisement keywords
+    ad_keywords = [
+        'direct from trapper',
+        'silver black foxes',
+        'all skins are taken',
+        'price, gold cloth',
+        'cents per copy',
+        'published by',
+        'printed by',
+        'for sale by'
+    ]
+    lower_text = stripped.lower()
+    if any(keyword in lower_text for keyword in ad_keywords):
+        return False
+
+    # Check if it's mostly uppercase (likely a title page or header spam)
+    alpha_chars = [c for c in stripped if c.isalpha()]
+    if alpha_chars:
+        upper_ratio = sum(1 for c in alpha_chars if c.isupper()) / len(alpha_chars)
+        # If >70% uppercase and shorter than 150 chars, probably not valuable content
+        if upper_ratio > 0.7 and len(stripped) < 150:
+            return False
+
+    # Check for copyright/legal text patterns
+    copyright_patterns = [
+        r'copyright.*\d{4}',
+        r'all rights reserved',
+        r'library of congress',
+        r'catalog.*entry',
+        r'press.*ltd',
+        r'printing.*company'
+    ]
+    if any(re.search(pattern, lower_text) for pattern in copyright_patterns):
+        return False
+
+    # Check if chunk has very few complete sentences (likely garbage or list)
+    # Look for sentence-ending punctuation followed by space or newline
+    sentence_endings = len(re.findall(r'[.!?][\s\n]', stripped))
+    # If chunk is over 100 chars but has fewer than 2 sentences, it's probably not prose
+    if len(stripped) > 100 and sentence_endings < 2:
+        # Exception: if it looks like a recipe (has measurements and ingredients)
+        recipe_indicators = ['jigger', 'dash', 'spoonful', 'glass', 'shake', 'stir', 'serve', 'strain']
+        if not any(indicator in lower_text for indicator in recipe_indicators):
+            return False
+
+    # If it has reasonable length and none of the above patterns, it's probably valuable
+    return True
+
+
 def sentence_chunks(text: str, max_chars=MAX_CHARS, overlap=OVERLAP_CHARS):
     """
     Simple sentence-ish chunking: split on punctuation boundaries and
     then pack into chunks up to max_chars with optional overlap.
+    Only returns chunks that pass the value check.
     """
     # Very simple sentence split; you can swap in nltk later if you like.
     sentences = re.split(r'(?<=[.!?])\s+', text)
@@ -124,7 +245,7 @@ def sentence_chunks(text: str, max_chars=MAX_CHARS, overlap=OVERLAP_CHARS):
         if len(candidate) <= max_chars:
             buf = candidate
         else:
-            if buf:
+            if buf and is_valuable_chunk(buf):
                 chunks.append(buf)
 
             # Start new buffer; optional overlap with previous chunk tail
@@ -133,7 +254,7 @@ def sentence_chunks(text: str, max_chars=MAX_CHARS, overlap=OVERLAP_CHARS):
             else:
                 buf = s
 
-    if buf:
+    if buf and is_valuable_chunk(buf):
         chunks.append(buf)
 
     return chunks
